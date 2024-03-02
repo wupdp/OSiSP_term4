@@ -3,6 +3,10 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <locale.h>
+#include <getopt.h>
+
+#define PATH_MAX 4096
 
 void dirwalk(const char *path, const char *options) {
     DIR *dir;
@@ -26,17 +30,14 @@ void dirwalk(const char *path, const char *options) {
         if (S_ISDIR(statbuf.st_mode)) {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
                 continue;
-
-            if (strstr(options, "d") != NULL || strstr(options, "a") != NULL)
-                printf("%s/\n", fullpath);
-
             dirwalk(fullpath, options);
-        } else if (S_ISLNK(statbuf.st_mode)) {
-            if (strstr(options, "l") != NULL || strstr(options, "a") != NULL)
-                printf("%s@\n", fullpath);
-        } else if (S_ISREG(statbuf.st_mode)) {
-            if (strstr(options, "f") != NULL || strstr(options, "a") != NULL)
-                printf("%s\n", fullpath);
+        }
+
+        if ((strstr(options, "l") != NULL && S_ISLNK(statbuf.st_mode)) ||
+            (strstr(options, "d") != NULL && S_ISDIR(statbuf.st_mode)) ||
+            (strstr(options, "f") != NULL && S_ISREG(statbuf.st_mode)) ||
+            (strcmp(options, "") == 0 && (S_ISLNK(statbuf.st_mode) || S_ISDIR(statbuf.st_mode) || S_ISREG(statbuf.st_mode)))) {
+            printf("%s\n", fullpath + 2);
         }
     }
 
@@ -44,10 +45,27 @@ void dirwalk(const char *path, const char *options) {
 }
 
 int main(int argc, char *argv[]) {
+    setlocale(LC_COLLATE, "");
+
     const char *path = (argc > 1) ? argv[1] : ".";
-    const char *options = (argc > 2) ? argv[2] : "a";
+    char options[10] = ""; // Создаем буфер для опций
+
+    int opt;
+    while ((opt = getopt(argc, argv, "ldfs")) != -1) {
+        switch (opt) {
+            case 'l':
+            case 'd':
+            case 'f':
+            case 's':
+                strcat(options, (char[]){opt, '\0'}); // Копируем опцию в буфер
+                break;
+            default:
+                break;
+        }
+    }
 
     dirwalk(path, options);
 
     return 0;
 }
+
